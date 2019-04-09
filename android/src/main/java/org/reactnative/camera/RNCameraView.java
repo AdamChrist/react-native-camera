@@ -141,6 +141,10 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
         }
 
         if (willCallFaceTask) {
+          // 修正前置摄像头的翻转问题
+          if (getFacing() == CameraView.FACING_FRONT) {
+            correctRotation = (correctRotation + 180) % 360;
+          }
           faceDetectorTaskLock = true;
           FaceDetectorAsyncTaskDelegate delegate = (FaceDetectorAsyncTaskDelegate) cameraView;
           new FaceDetectorAsyncTask(delegate, mFaceDetector, data, width, height, correctRotation, getResources().getDisplayMetrics().density, getFacing(), getWidth(), getHeight(), mPaddingX, mPaddingY).execute();
