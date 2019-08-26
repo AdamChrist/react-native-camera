@@ -10,6 +10,7 @@ import android.support.media.ExifInterface;
 import android.view.ViewGroup;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactContext;
+import com.facebook.react.bridge.ReadableMapKeySetIterator;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.uimanager.UIManagerModule;
@@ -235,7 +236,8 @@ public class RNCameraViewHelper {
 
   public static int getCorrectCameraRotation(int rotation, int facing, int cameraOrientation) {
     if (facing == CameraView.FACING_FRONT) {
-      return (360 - (cameraOrientation + rotation) % 360) % 360;
+      // Tested the below line and there's no need to do the mirror calculation
+      return (cameraOrientation + rotation) % 360;
     } else {
       final int landscapeFlip = rotationIsLandscape(rotation) ? 180 : 0;
       return (cameraOrientation - rotation + landscapeFlip) % 360;
@@ -305,6 +307,36 @@ public class RNCameraViewHelper {
     }
 
     return exifMap;
+  }
+
+  public static void setExifData(ExifInterface exifInterface, WritableMap exifMap) {
+    for (String[] tagInfo : exifTags) {
+      String name = tagInfo[1];
+      if (exifMap.hasKey(name)) {
+        String type = tagInfo[0];
+        switch (type) {
+          case "string":
+            exifInterface.setAttribute(name, exifMap.getString(name));
+            break;
+          case "int":
+            exifInterface.setAttribute(name, Integer.toString(exifMap.getInt(name)));
+            exifMap.getInt(name);
+            break;
+          case "double":
+            exifInterface.setAttribute(name, Double.toString(exifMap.getDouble(name)));
+            exifMap.getDouble(name);
+            break;
+        }
+      }
+    }
+    
+    if (exifMap.hasKey(ExifInterface.TAG_GPS_LATITUDE) && 
+        exifMap.hasKey(ExifInterface.TAG_GPS_LONGITUDE) && 
+        exifMap.hasKey(ExifInterface.TAG_GPS_ALTITUDE)) {
+      exifInterface.setLatLong(exifMap.getDouble(ExifInterface.TAG_GPS_LATITUDE),
+                               exifMap.getDouble(ExifInterface.TAG_GPS_LONGITUDE));
+      exifInterface.setAltitude(exifMap.getDouble(ExifInterface.TAG_GPS_ALTITUDE));
+    }
   }
 
   public static Bitmap generateSimulatorPhoto(int width, int height) {

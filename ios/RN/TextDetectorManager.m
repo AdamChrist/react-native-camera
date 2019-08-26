@@ -12,7 +12,6 @@
 - (instancetype)init
 {
   if (self = [super init]) {
-    NSLog(@"init text detector");
     FIRVision *vision = [FIRVision vision];
     self.textRecognizer = [vision onDeviceTextRecognizer];
   }
@@ -36,7 +35,7 @@
                            if (error != nil || result == nil) {
                                completed(textBlocks);
                            } else {
-                           completed([self processBlocks:result.blocks]);
+                               completed([self processBlocks:result.blocks]);
                            }
                        }];
 }
@@ -44,10 +43,10 @@
 - (NSArray *)processBlocks:(NSArray *)features
 {
   NSMutableArray *textBlocks = [[NSMutableArray alloc] init];
-    for (FIRVisionTextBlock *textBlock in features) {
-        NSDictionary *textBlockDict = 
-        @{@"type": @"block", @"value" : textBlock.text, @"bounds" : [self processBounds:textBlock.frame], @"components" : [self processLine:textBlock.lines]};
-        [textBlocks addObject:textBlockDict];
+  for (FIRVisionTextBlock *textBlock in features) {
+      NSDictionary *textBlockDict = 
+      @{@"type": @"block", @"value" : textBlock.text, @"bounds" : [self processBounds:textBlock.frame], @"components" : [self processLine:textBlock.lines]};
+      [textBlocks addObject:textBlockDict];
   }
   return textBlocks;
 }
@@ -59,8 +58,8 @@
         NSDictionary *textLineDict = 
         @{@"type": @"line", @"value" : textLine.text, @"bounds" : [self processBounds:textLine.frame], @"components" : [self processElement:textLine.elements]};
         [lineBlocks addObject:textLineDict];
-        }
-    return lineBlocks;
+  }
+  return lineBlocks;
 }
 
 -(NSArray *)processElement:(NSArray *)elements 
@@ -70,8 +69,8 @@
         NSDictionary *textElementDict = 
         @{@"type": @"element", @"value" : textElement.text, @"bounds" : [self processBounds:textElement.frame]};
         [elementBlocks addObject:textElementDict];
-        }
-    return elementBlocks;
+  }
+  return elementBlocks;
 }
 
 -(NSDictionary *)processBounds:(CGRect)bounds 
@@ -98,7 +97,6 @@
 
 @end
 #else
-#import <React/RCTLog.h>
 
 @interface TextDetectorManager ()
 @end
@@ -116,11 +114,11 @@
   return false;
 }
 
--(NSArray *)findTextBlocksInFrame:(UIImage *)image scaleX:(float)scaleX scaleY:(float) scaleY;
+-(void)findTextBlocksInFrame:(UIImage *)image scaleX:(float)scaleX scaleY:(float) scaleY completed:(postRecognitionBlock)completed;
 {
-  RCTLogWarn(@"TextDetector not installed, stub used!");
+  NSLog(@"TextDetector not installed, stub used!");
   NSArray *features = @[@"Error, Text Detector not installed"];
-  return features;
+  completed(features);
 }
 
 @end

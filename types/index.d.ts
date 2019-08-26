@@ -11,7 +11,7 @@
  * If you are seeing this from the future, please, send us your cutting-edge technology :) (if it exists)
  */
 import { Component, ReactNode } from 'react';
-import { ViewProperties } from 'react-native';
+import { NativeMethodsMixinStatic, ViewProperties, findNodeHandle } from 'react-native';
 
 type Orientation = Readonly<{
   auto: any;
@@ -80,6 +80,7 @@ type GoogleVisionBarcodeType = Readonly<{
   UPC_E: any;
   PDF417: any;
   AZTEC: any;
+  ALL: any;
 }>;
 type GoogleVisionBarcodeMode = Readonly<{ NORMAL: any; ALTERNATE: any; INVERTED: any }>;
 
@@ -132,6 +133,7 @@ export interface RNCameraProps {
   children?: ReactNode | FaCC;
 
   autoFocus?: keyof AutoFocus;
+  autoFocusPointOfInterest?: Point;
   type?: keyof CameraType;
   flashMode?: keyof FlashMode;
   notAuthorizedView?: JSX.Element;
@@ -141,7 +143,10 @@ export interface RNCameraProps {
   captureAudio?: boolean;
 
   onCameraReady?(): void;
-  onStatusChange?(event: { cameraStatus: CameraStatus, recordAudioPermissionStatus: keyof RecordAudioPermissionStatus }): void;
+  onStatusChange?(event: {
+    cameraStatus: keyof CameraStatus;
+    recordAudioPermissionStatus: keyof RecordAudioPermissionStatus;
+  }): void;
   onMountError?(error: { message: string }): void;
 
   /** Value: float from 0 to 1.0 */
@@ -151,7 +156,7 @@ export interface RNCameraProps {
 
   // -- BARCODE PROPS
   barCodeTypes?: Array<keyof BarCodeType>;
-  googleVisionBarcodeType?: keyof GoogleVisionBarcodeType;
+  googleVisionBarcodeType?: Constants['GoogleVisionBarcodeDetection']['BarcodeType'];
   onBarCodeRead?(event: {
     data: string;
     rawData?: string;
@@ -165,10 +170,6 @@ export interface RNCameraProps {
 
   onGoogleVisionBarcodesDetected?(event: {
     barcodes: Barcode[];
-    sourceRotation: number;
-    sourceHeight: number;
-    sourceWidth: number;
-    type: keyof GoogleVisionBarcodeType;
   }): void;
 
   // -- FACE DETECTION PROPS
@@ -178,18 +179,34 @@ export interface RNCameraProps {
   faceDetectionMode?: keyof FaceDetectionMode;
   faceDetectionLandmarks?: keyof FaceDetectionLandmarks;
   faceDetectionClassifications?: keyof FaceDetectionClassifications;
+  trackingEnabled?: boolean;
 
+  onTextRecognized?(response: { textBlocks: TrackedTextFeature[] }): void;
   // -- ANDROID ONLY PROPS
   /** Android only */
-  onTextRecognized?(response: { textBlocks: TrackedTextFeature[] }): void;
-  /** Android only */
   ratio?: string;
-  /** Android only */
+  /** Android only - Deprecated */
   permissionDialogTitle?: string;
-  /** Android only */
+  /** Android only - Deprecated */
   permissionDialogMessage?: string;
   /** Android only */
   playSoundOnCapture?: boolean;
+
+  androidCameraPermissionOptions?: {
+    title: string;
+    message: string;
+    buttonPositive?: string;
+    buttonNegative?: string;
+    buttonNeutral?: string;
+  };
+
+  androidRecordAudioPermissionOptions?: {
+    title: string;
+    message: string;
+    buttonPositive?: string;
+    buttonNegative?: string;
+    buttonNeutral?: string;
+  };
 
   // -- IOS ONLY PROPS
   defaultVideoQuality?: keyof VideoQuality;
@@ -211,7 +228,82 @@ interface Barcode {
     origin: Point;
   };
   data: string;
-  type: string;
+  dataRaw: string;
+  type: BarcodeType;
+  addresses?: {
+    addressesType?: "UNKNOWN" | "Work" | "Home";
+    addressLines?: string[];
+  }[];
+  emails?: Email[];
+  phones?: Phone[];
+  urls?: string[];
+  name?: {
+    firstName?: string;
+    lastName?: string;
+    middleName?: string;
+    prefix?:string;
+    pronounciation?:string;
+    suffix?:string;
+    formattedName?: string;
+  };
+  phone?: Phone;
+  organization?: string;
+  latitude?: number;
+  longitude?: number;
+  ssid?: string;
+  password?: string;
+  encryptionType?: string;
+  title?: string;
+  url?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  gender?: string;
+  addressCity?: string;
+  addressState?: string;
+  addressStreet?: string;
+  addressZip?: string;
+  birthDate?: string;
+  documentType?: string;
+  licenseNumber?: string;
+  expiryDate?: string;
+  issuingDate?: string;
+  issuingCountry?: string;
+  eventDescription?: string;
+  location?: string;
+  organizer?: string;
+  status?: string;
+  summary?: string;
+  start?: string;
+  end?: string;
+  email?: Email;
+  phoneNumber?: string;
+  message?: string;
+}
+
+type BarcodeType =
+  |"EMAIL"
+  |"PHONE"
+  |"CALENDAR_EVENT"
+  |"DRIVER_LICENSE"
+  |"GEO"
+  |"SMS"
+  |"CONTACT_INFO"
+  |"WIFI"
+  |"TEXT"
+  |"ISBN"
+  |"PRODUCT"
+
+interface Email {
+  address?: string;
+  body?: string;
+  subject?: string;
+  emailType?: "UNKNOWN" | "Work" | "Home";
+}
+
+interface Phone {
+  number?: string;
+  phoneType?: "UNKNOWN" | "Work" | "Home" | "Fax" | "Mobile";
 }
 
 interface Face {
@@ -261,6 +353,7 @@ interface TakePictureOptions {
   /** Android only */
   skipProcessing?: boolean;
   fixOrientation?: boolean;
+  writeExif?: boolean | { [name: string]: any };
 
   /** iOS only */
   forceUpOrientation?: boolean;
@@ -297,12 +390,16 @@ interface RecordResponse {
   uri: string;
   videoOrientation: number;
   deviceOrientation: number;
+  isRecordingInterrupted: boolean;
   /** iOS only */
   codec: VideoCodec[keyof VideoCodec];
 }
 
 export class RNCamera extends Component<RNCameraProps & ViewProperties> {
   static Constants: Constants;
+
+  _cameraRef: null | NativeMethodsMixinStatic;
+  _cameraHandle: ReturnType<typeof findNodeHandle>;
 
   takePictureAsync(options?: TakePictureOptions): Promise<TakePictureResponse>;
   recordAsync(options?: RecordOptions): Promise<RecordResponse>;
