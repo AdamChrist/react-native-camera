@@ -92,6 +92,32 @@ public class BarCodeScannerAsyncTask extends android.os.AsyncTask<Void, Void, Re
     }
     return rotated;
   }
+
+  //clockwise
+  public byte[] rotated90(byte[] data, int width, int height) {
+    byte[] rotatedData = new byte[data.length];
+    int area = width * height;
+
+    if (data.length >= area) {
+      for (int y = 0; y < height; y++) { // rotate Y
+        for (int x = 0; x < width; x++)
+          rotatedData[x * height + height - y - 1] = data[x + y * width];
+      }
+    }
+
+    if (data.length == area * 1.5f) {
+      for (int y = 0; y < height / 2; y++) { // rotate CbCr
+        for (int x = 0; x < width / 2; x++) {
+          rotatedData[area + x * height + height - 2 * y - 2]
+                  = data[area + 2 * x + y * width];
+          rotatedData[area + x * height + height - 2 * y - 1]
+                  = data[area + 2 * x + y * width + 1];
+        }
+      }
+    }
+    return rotatedData;
+  }
+
   @Override
   protected void onPostExecute(Result result) {
     super.onPostExecute(result);
@@ -102,15 +128,31 @@ public class BarCodeScannerAsyncTask extends android.os.AsyncTask<Void, Void, Re
   }
 
   private BinaryBitmap generateBitmapFromImageData(byte[] imageData, int width, int height, boolean inverse) {
+
+    int top;
+    int left;
+    int box;
+
+    // 裁切二维码解析图像的大小
+    if (width < height) {
+      box = (int) (width * 0.7);
+      top = (height - box) / 2;
+      left = (width - box) / 2;
+    } else {
+      box = (int) (height * 0.7);
+      top = (height - box) / 2;
+      left = (width - box) / 2;
+    }
+
     PlanarYUVLuminanceSource source = new PlanarYUVLuminanceSource(
-        imageData, // byte[] yuvData
-        width, // int dataWidth
-        height, // int dataHeight
-        0, // int left
-        0, // int top
-        width, // int width
-        height, // int height
-        false // boolean reverseHorizontal
+            imageData, // byte[] yuvData
+            width, // int dataWidth
+            height, // int dataHeight
+            left, // int left
+            top, // int top
+            box, // int width
+            box, // int height
+            false // boolean reverseHorizontal
     );
     if (inverse) {
       return new BinaryBitmap(new HybridBinarizer(source.invert()));
