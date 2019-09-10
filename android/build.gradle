@@ -25,6 +25,11 @@ android {
   defaultConfig {
     minSdkVersion safeExtGet('minSdkVersion', 16)
     targetSdkVersion safeExtGet('targetSdkVersion', 28)
+
+    ndk {
+      //设置支持的SO库架构
+      abiFilters 'armeabi-v7a'
+    }
   }
 
   flavorDimensions "react-native-camera"
@@ -41,6 +46,7 @@ android {
   sourceSets {
     main {
       java.srcDirs = ['src/main/java']
+      jniLibs.srcDirs = ['libs']
     }
     general {
       java.srcDirs = ['src/general/java']
@@ -72,6 +78,7 @@ repositories {
 dependencies {
   def googlePlayServicesVisionVersion = safeExtGet('googlePlayServicesVisionVersion', safeExtGet('googlePlayServicesVersion', '17.0.2'))
 
+  implementation fileTree(include: ['*.jar'], dir: 'libs')
   implementation 'com.facebook.react:react-native:+'
   implementation "com.google.zxing:core:3.3.3"
   implementation "com.drewnoakes:metadata-extractor:2.11.0"
