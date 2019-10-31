@@ -231,6 +231,12 @@ public class RNCameraViewHelper {
     reactContext.getNativeModule(UIManagerModule.class).getEventDispatcher().dispatchEvent(event);
   }
 
+  public static void emitTFObjectDetectedEvent(ViewGroup view, WritableArray data) {
+    TFObjectDetectedEvent event = TFObjectDetectedEvent.obtain(view.getId(), data);
+    ReactContext reactContext = (ReactContext) view.getContext();
+    reactContext.getNativeModule(UIManagerModule.class).getEventDispatcher().dispatchEvent(event);
+  }
+
   // Utilities
 
   public static int getCorrectCameraRotation(int rotation, int facing, int cameraOrientation) {

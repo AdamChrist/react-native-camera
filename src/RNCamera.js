@@ -54,7 +54,7 @@ const requestPermissions = async (
           params,
         );
         if (typeof audioPermissionResult === 'boolean') {
-          hasRecordAudioPermissions = audioPermissionResult
+          hasRecordAudioPermissions = audioPermissionResult;
         } else {
           hasRecordAudioPermissions = audioPermissionResult === PermissionsAndroid.RESULTS.GRANTED;
         }
@@ -62,8 +62,8 @@ const requestPermissions = async (
         // eslint-disable-next-line no-console
         console.warn(
           `The 'captureAudio' property set on RNCamera instance but 'RECORD_AUDIO' permissions not defined in the applications 'AndroidManifest.xml'. ` +
-            `If you want to record audio you will have to add '<uses-permission android:name="android.permission.RECORD_AUDIO"/>' to your 'AndroidManifest.xml'. ` +
-            `Otherwise you should set the 'captureAudio' property on the component instance to 'false'.`,
+          `If you want to record audio you will have to add '<uses-permission android:name="android.permission.RECORD_AUDIO"/>' to your 'AndroidManifest.xml'. ` +
+          `Otherwise you should set the 'captureAudio' property on the component instance to 'false'.`,
         );
       }
     }
@@ -105,6 +105,31 @@ type PictureOptions = {
 type TrackedFaceFeature = FaceFeature & {
   faceID?: number,
 };
+
+type TrackedTFObjectFeature = {
+  id?: number,
+  confidence?: number,
+  index?: number,
+  location?: {
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+    centerX: number,
+    centerY: number
+  }
+}
+
+type TFObjectOptions = {
+  modelPath?: string,
+  numDetections?: number,
+  imageMean?: number,
+  imageStd?: number,
+  numThreads?: number,
+  isModelQuantized?: number,
+  inputSize?: number,
+  minimumConfidence?: number
+}
 
 type TrackedTextFeature = {
   type: string,
@@ -159,6 +184,8 @@ type PropsType = typeof View.props & {
   autoFocusPointOfInterest?: { x: number, y: number },
   faceDetectionClassifications?: number,
   onFacesDetected?: ({ faces: Array<TrackedFaceFeature> }) => void,
+  TFOptions?: TFObjectOptions,
+  onTFObjectDetected?: ({ result: Array<TrackedTFObjectFeature> }) => void,
   onTextRecognized?: ({ textBlocks: Array<TrackedTextFeature> }) => void,
   captureAudio?: boolean,
   useCamera2Api?: boolean,
@@ -231,7 +258,7 @@ const mapValues = (input, mapper) => {
   return result;
 };
 
-export default class Camera extends React.Component<PropsType, StateType> {
+export default class Camera extends React.PureComponent<PropsType, StateType> {
   static Constants = {
     Type: CameraManager.Type,
     FlashMode: CameraManager.FlashMode,
@@ -280,6 +307,8 @@ export default class Camera extends React.Component<PropsType, StateType> {
     onPictureSaved: PropTypes.func,
     onGoogleVisionBarcodesDetected: PropTypes.func,
     onFacesDetected: PropTypes.func,
+    onTFObjectDetected: PropTypes.func,
+    TFOptions: PropTypes.object,
     onTextRecognized: PropTypes.func,
     faceDetectionMode: PropTypes.number,
     faceDetectionLandmarks: PropTypes.number,
@@ -332,7 +361,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     ),
     pendingAuthorizationView: (
       <View style={styles.authorizationContainer}>
-        <ActivityIndicator size="small" />
+        <ActivityIndicator size="small"/>
       </View>
     ),
     captureAudio: true,
@@ -349,7 +378,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
   _lastEventsTimes: { [string]: Date };
   _isMounted: boolean;
 
-  constructor(props: PropsType) {
+  constructor (props: PropsType) {
     super(props);
     this._lastEvents = {};
     this._lastEventsTimes = {};
@@ -361,7 +390,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     };
   }
 
-  async takePictureAsync(options?: PictureOptions) {
+  async takePictureAsync (options?: PictureOptions) {
     if (!options) {
       options = {};
     }
@@ -389,7 +418,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     return await CameraManager.takePicture(options, this._cameraHandle);
   }
 
-  async getSupportedRatiosAsync() {
+  async getSupportedRatiosAsync () {
     if (Platform.OS === 'android') {
       return await CameraManager.getSupportedRatios(this._cameraHandle);
     } else {
@@ -402,7 +431,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     return await CameraManager.getAvailablePictureSizes(this.props.ratio, this._cameraHandle);
   };
 
-  async recordAsync(options?: RecordingOptions) {
+  async recordAsync (options?: RecordingOptions) {
     if (!options || typeof options !== 'object') {
       options = {};
     } else if (typeof options.quality === 'string') {
@@ -451,19 +480,19 @@ export default class Camera extends React.Component<PropsType, StateType> {
     return await CameraManager.record(options, this._cameraHandle);
   }
 
-  stopRecording() {
+  stopRecording () {
     CameraManager.stopRecording(this._cameraHandle);
   }
 
-  pausePreview() {
+  pausePreview () {
     CameraManager.pausePreview(this._cameraHandle);
   }
 
-  isRecording() {
+  isRecording () {
     return CameraManager.isRecording(this._cameraHandle);
   }
 
-  resumePreview() {
+  resumePreview () {
     CameraManager.resumePreview(this._cameraHandle);
   }
 
@@ -481,7 +510,10 @@ export default class Camera extends React.Component<PropsType, StateType> {
 
   _onStatusChange = () => {
     if (this.props.onStatusChange) {
-      this.props.onStatusChange({ cameraStatus: this.getStatus(), recordAudioPermissionStatus: this.state.recordAudioPermissionStatus });
+      this.props.onStatusChange({
+        cameraStatus: this.getStatus(),
+        recordAudioPermissionStatus: this.state.recordAudioPermissionStatus,
+      });
     }
   };
 
@@ -520,11 +552,11 @@ export default class Camera extends React.Component<PropsType, StateType> {
     }
   };
 
-  componentWillUnmount() {
+  componentWillUnmount () {
     this._isMounted = false;
   }
 
-  async arePermissionsGranted() {
+  async arePermissionsGranted () {
     const { hasCameraPermissions, hasRecordAudioPermissions } = await requestPermissions(
       this.props.captureAudio,
       CameraManager,
@@ -537,7 +569,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     return { hasCameraPermissions, recordAudioPermissionStatus };
   }
 
-  async refreshAuthorizationStatus() {
+  async refreshAuthorizationStatus () {
     const {
       hasCameraPermissions,
       recordAudioPermissionStatus,
@@ -553,7 +585,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     });
   }
 
-  async componentDidMount() {
+  async componentDidMount () {
     const {
       hasCameraPermissions,
       recordAudioPermissionStatus,
@@ -591,7 +623,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     return this.props.children;
   };
 
-  render() {
+  render () {
     const { style, ...nativeProps } = this._convertNativeProps(this.props);
 
     if (this.state.isAuthorized || this.hasFaCC()) {
@@ -608,6 +640,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
             )}
             onBarCodeRead={this._onObjectDetected(this.props.onBarCodeRead)}
             onFacesDetected={this._onObjectDetected(this.props.onFacesDetected)}
+            onTFObjectDetected={this._onObjectDetected(this.props.onTFObjectDetected)}
             onTextRecognized={this._onObjectDetected(this.props.onTextRecognized)}
             onPictureSaved={this._onPictureSaved}
           />
@@ -621,7 +654,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     }
   }
 
-  _convertNativeProps({ children, ...props }: PropsType) {
+  _convertNativeProps ({ children, ...props }: PropsType) {
     const newProps = mapValues(props, this._convertProp);
 
     if (props.onBarCodeRead) {
@@ -634,6 +667,10 @@ export default class Camera extends React.Component<PropsType, StateType> {
 
     if (props.onFacesDetected) {
       newProps.faceDetectorEnabled = true;
+    }
+
+    if (props.onTFObjectDetected) {
+      newProps.TFObjectDetectorEnabled = true;
     }
 
     if (props.onTextRecognized) {
@@ -650,7 +687,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     return newProps;
   }
 
-  _convertProp(value: *, key: string): * {
+  _convertProp (value: *, key: string): * {
     if (typeof value === 'string' && Camera.ConversionTables[key]) {
       return Camera.ConversionTables[key][value];
     }
@@ -667,11 +704,13 @@ const RNCamera = requireNativeComponent('RNCamera', Camera, {
     accessibilityLabel: true,
     accessibilityLiveRegion: true,
     barCodeScannerEnabled: true,
+    TFObjectDetectorEnabled: true,
     googleVisionBarcodeDetectorEnabled: true,
     faceDetectorEnabled: true,
     textRecognizerEnabled: true,
     importantForAccessibility: true,
     onBarCodeRead: true,
+    onTFObjectDetected: true,
     onGoogleVisionBarcodesDetected: true,
     onCameraReady: true,
     onPictureSaved: true,

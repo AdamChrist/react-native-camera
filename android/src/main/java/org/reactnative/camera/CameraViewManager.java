@@ -1,6 +1,7 @@
 package org.reactnative.camera;
 
 import android.support.annotation.Nullable;
+
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.common.MapBuilder;
@@ -14,176 +15,199 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import tflite.TFOptions;
+
 public class CameraViewManager extends ViewGroupManager<RNCameraView> {
-  public enum Events {
-    EVENT_CAMERA_READY("onCameraReady"),
-    EVENT_ON_MOUNT_ERROR("onMountError"),
-    EVENT_ON_BAR_CODE_READ("onBarCodeRead"),
-    EVENT_ON_FACES_DETECTED("onFacesDetected"),
-    EVENT_ON_BARCODES_DETECTED("onGoogleVisionBarcodesDetected"),
-    EVENT_ON_FACE_DETECTION_ERROR("onFaceDetectionError"),
-    EVENT_ON_BARCODE_DETECTION_ERROR("onGoogleVisionBarcodeDetectionError"),
-    EVENT_ON_TEXT_RECOGNIZED("onTextRecognized"),
-    EVENT_ON_PICTURE_TAKEN("onPictureTaken"),
-    EVENT_ON_PICTURE_SAVED("onPictureSaved");
+    public enum Events {
+        EVENT_CAMERA_READY("onCameraReady"),
+        EVENT_ON_MOUNT_ERROR("onMountError"),
+        EVENT_ON_BAR_CODE_READ("onBarCodeRead"),
+        EVENT_ON_FACES_DETECTED("onFacesDetected"),
+        EVENT_ON_BARCODES_DETECTED("onGoogleVisionBarcodesDetected"),
+        EVENT_ON_FACE_DETECTION_ERROR("onFaceDetectionError"),
+        EVENT_ON_BARCODE_DETECTION_ERROR("onGoogleVisionBarcodeDetectionError"),
+        EVENT_ON_TEXT_RECOGNIZED("onTextRecognized"),
+        EVENT_ON_PICTURE_TAKEN("onPictureTaken"),
+        EVENT_ON_PICTURE_SAVED("onPictureSaved"),
+        EVENT_ON_TF_OBJECT_DETECTED("onTFObjectDetected");
 
-    private final String mName;
+        private final String mName;
 
-    Events(final String name) {
-      mName = name;
+        Events(final String name) {
+            mName = name;
+        }
+
+        @Override
+        public String toString() {
+            return mName;
+        }
+    }
+
+    private static final String REACT_CLASS = "RNCamera";
+
+    @Override
+    public void onDropViewInstance(RNCameraView view) {
+        view.stop();
+        super.onDropViewInstance(view);
+    }
+
+
+    @Override
+    public String getName() {
+        return REACT_CLASS;
     }
 
     @Override
-    public String toString() {
-      return mName;
+    protected RNCameraView createViewInstance(ThemedReactContext themedReactContext) {
+        return new RNCameraView(themedReactContext);
     }
-  }
 
-  private static final String REACT_CLASS = "RNCamera";
-
-  @Override
-  public void onDropViewInstance(RNCameraView view) {
-    view.stop();
-    super.onDropViewInstance(view);
-  }
-
-
-  @Override
-  public String getName() {
-    return REACT_CLASS;
-  }
-
-  @Override
-  protected RNCameraView createViewInstance(ThemedReactContext themedReactContext) {
-    return new RNCameraView(themedReactContext);
-  }
-
-  @Override
-  @Nullable
-  public Map<String, Object> getExportedCustomDirectEventTypeConstants() {
-    MapBuilder.Builder<String, Object> builder = MapBuilder.builder();
-    for (Events event : Events.values()) {
-      builder.put(event.toString(), MapBuilder.of("registrationName", event.toString()));
+    @Override
+    @Nullable
+    public Map<String, Object> getExportedCustomDirectEventTypeConstants() {
+        MapBuilder.Builder<String, Object> builder = MapBuilder.builder();
+        for (Events event : Events.values()) {
+            builder.put(event.toString(), MapBuilder.of("registrationName", event.toString()));
+        }
+        return builder.build();
     }
-    return builder.build();
-  }
 
-  @ReactProp(name = "type")
-  public void setType(RNCameraView view, int type) {
-    view.setFacing(type);
-  }
-
-  @ReactProp(name = "ratio")
-  public void setRatio(RNCameraView view, String ratio) {
-    view.setAspectRatio(AspectRatio.parse(ratio));
-  }
-
-  @ReactProp(name = "flashMode")
-  public void setFlashMode(RNCameraView view, int torchMode) {
-    view.setFlash(torchMode);
-  }
-
-  @ReactProp(name = "exposure")
-  public void setExposureCompensation(RNCameraView view, int exposure){
-    view.setExposureCompensation(exposure);
-  }
-
-  @ReactProp(name = "autoFocus")
-  public void setAutoFocus(RNCameraView view, boolean autoFocus) {
-    view.setAutoFocus(autoFocus);
-  }
-
-  @ReactProp(name = "focusDepth")
-  public void setFocusDepth(RNCameraView view, float depth) {
-    view.setFocusDepth(depth);
-  }
-
-  @ReactProp(name = "autoFocusPointOfInterest")
-  public void setAutoFocusPointOfInterest(RNCameraView view, ReadableMap coordinates) {
-    float x = (float) coordinates.getDouble("x");
-    float y = (float) coordinates.getDouble("y");
-    view.setAutoFocusPointOfInterest(x, y);
-  }
-
-  @ReactProp(name = "zoom")
-  public void setZoom(RNCameraView view, float zoom) {
-    view.setZoom(zoom);
-  }
-
-  @ReactProp(name = "whiteBalance")
-  public void setWhiteBalance(RNCameraView view, int whiteBalance) {
-    view.setWhiteBalance(whiteBalance);
-  }
-
-  @ReactProp(name = "pictureSize")
-  public void setPictureSize(RNCameraView view, String size) {
-    view.setPictureSize(size.equals("None") ? null : Size.parse(size));
-  }
-
-  @ReactProp(name = "barCodeTypes")
-  public void setBarCodeTypes(RNCameraView view, ReadableArray barCodeTypes) {
-    if (barCodeTypes == null) {
-      return;
+    @ReactProp(name = "type")
+    public void setType(RNCameraView view, int type) {
+        view.setFacing(type);
     }
-    List<String> result = new ArrayList<>(barCodeTypes.size());
-    for (int i = 0; i < barCodeTypes.size(); i++) {
-      result.add(barCodeTypes.getString(i));
+
+    @ReactProp(name = "ratio")
+    public void setRatio(RNCameraView view, String ratio) {
+        view.setAspectRatio(AspectRatio.parse(ratio));
     }
-    view.setBarCodeTypes(result);
-  }
 
-  @ReactProp(name = "barCodeScannerEnabled")
-  public void setBarCodeScanning(RNCameraView view, boolean barCodeScannerEnabled) {
-    view.setShouldScanBarCodes(barCodeScannerEnabled);
-  }
+    @ReactProp(name = "flashMode")
+    public void setFlashMode(RNCameraView view, int torchMode) {
+        view.setFlash(torchMode);
+    }
 
-  @ReactProp(name = "useCamera2Api")
-  public void setUseCamera2Api(RNCameraView view, boolean useCamera2Api) {
-    view.setUsingCamera2Api(useCamera2Api);
-  }
+    @ReactProp(name = "exposure")
+    public void setExposureCompensation(RNCameraView view, int exposure) {
+        view.setExposureCompensation(exposure);
+    }
 
-  @ReactProp(name = "playSoundOnCapture")
-  public void setPlaySoundOnCapture(RNCameraView view, boolean playSoundOnCapture) {
-    view.setPlaySoundOnCapture(playSoundOnCapture);
-  }
+    @ReactProp(name = "autoFocus")
+    public void setAutoFocus(RNCameraView view, boolean autoFocus) {
+        view.setAutoFocus(autoFocus);
+    }
 
-  @ReactProp(name = "faceDetectorEnabled")
-  public void setFaceDetecting(RNCameraView view, boolean faceDetectorEnabled) {
-    view.setShouldDetectFaces(faceDetectorEnabled);
-  }
+    @ReactProp(name = "focusDepth")
+    public void setFocusDepth(RNCameraView view, float depth) {
+        view.setFocusDepth(depth);
+    }
 
-  @ReactProp(name = "faceDetectionMode")
-  public void setFaceDetectionMode(RNCameraView view, int mode) {
-    view.setFaceDetectionMode(mode);
-  }
+    @ReactProp(name = "autoFocusPointOfInterest")
+    public void setAutoFocusPointOfInterest(RNCameraView view, ReadableMap coordinates) {
+        float x = (float) coordinates.getDouble("x");
+        float y = (float) coordinates.getDouble("y");
+        view.setAutoFocusPointOfInterest(x, y);
+    }
 
-  @ReactProp(name = "faceDetectionLandmarks")
-  public void setFaceDetectionLandmarks(RNCameraView view, int landmarks) {
-    view.setFaceDetectionLandmarks(landmarks);
-  }
+    @ReactProp(name = "zoom")
+    public void setZoom(RNCameraView view, float zoom) {
+        view.setZoom(zoom);
+    }
 
-  @ReactProp(name = "faceDetectionClassifications")
-  public void setFaceDetectionClassifications(RNCameraView view, int classifications) {
-    view.setFaceDetectionClassifications(classifications);
-  }
+    @ReactProp(name = "whiteBalance")
+    public void setWhiteBalance(RNCameraView view, int whiteBalance) {
+        view.setWhiteBalance(whiteBalance);
+    }
 
-  @ReactProp(name = "googleVisionBarcodeDetectorEnabled")
-  public void setGoogleVisionBarcodeDetecting(RNCameraView view, boolean googleBarcodeDetectorEnabled) {
-    view.setShouldGoogleDetectBarcodes(googleBarcodeDetectorEnabled);
-  }
+    @ReactProp(name = "pictureSize")
+    public void setPictureSize(RNCameraView view, String size) {
+        view.setPictureSize(size.equals("None") ? null : Size.parse(size));
+    }
 
-  @ReactProp(name = "googleVisionBarcodeType")
-  public void setGoogleVisionBarcodeType(RNCameraView view, int barcodeType) {
-    view.setGoogleVisionBarcodeType(barcodeType);
-  }
+    @ReactProp(name = "barCodeTypes")
+    public void setBarCodeTypes(RNCameraView view, ReadableArray barCodeTypes) {
+        if (barCodeTypes == null) {
+            return;
+        }
+        List<String> result = new ArrayList<>(barCodeTypes.size());
+        for (int i = 0; i < barCodeTypes.size(); i++) {
+            result.add(barCodeTypes.getString(i));
+        }
+        view.setBarCodeTypes(result);
+    }
 
-  @ReactProp(name = "googleVisionBarcodeMode")
-  public void setGoogleVisionBarcodeMode(RNCameraView view, int barcodeMode) {
-    view.setGoogleVisionBarcodeMode(barcodeMode);
-  }
+    @ReactProp(name = "barCodeScannerEnabled")
+    public void setBarCodeScanning(RNCameraView view, boolean barCodeScannerEnabled) {
+        view.setShouldScanBarCodes(barCodeScannerEnabled);
+    }
 
-  @ReactProp(name = "textRecognizerEnabled")
-  public void setTextRecognizing(RNCameraView view, boolean textRecognizerEnabled) {
-    view.setShouldRecognizeText(textRecognizerEnabled);
-  }
+    @ReactProp(name = "useCamera2Api")
+    public void setUseCamera2Api(RNCameraView view, boolean useCamera2Api) {
+        view.setUsingCamera2Api(useCamera2Api);
+    }
+
+    @ReactProp(name = "playSoundOnCapture")
+    public void setPlaySoundOnCapture(RNCameraView view, boolean playSoundOnCapture) {
+        view.setPlaySoundOnCapture(playSoundOnCapture);
+    }
+
+    @ReactProp(name = "faceDetectorEnabled")
+    public void setFaceDetecting(RNCameraView view, boolean faceDetectorEnabled) {
+        view.setShouldDetectFaces(faceDetectorEnabled);
+    }
+
+    @ReactProp(name = "faceDetectionMode")
+    public void setFaceDetectionMode(RNCameraView view, int mode) {
+        view.setFaceDetectionMode(mode);
+    }
+
+    @ReactProp(name = "faceDetectionLandmarks")
+    public void setFaceDetectionLandmarks(RNCameraView view, int landmarks) {
+        view.setFaceDetectionLandmarks(landmarks);
+    }
+
+    @ReactProp(name = "faceDetectionClassifications")
+    public void setFaceDetectionClassifications(RNCameraView view, int classifications) {
+        view.setFaceDetectionClassifications(classifications);
+    }
+
+    @ReactProp(name = "googleVisionBarcodeDetectorEnabled")
+    public void setGoogleVisionBarcodeDetecting(RNCameraView view, boolean googleBarcodeDetectorEnabled) {
+        view.setShouldGoogleDetectBarcodes(googleBarcodeDetectorEnabled);
+    }
+
+    @ReactProp(name = "googleVisionBarcodeType")
+    public void setGoogleVisionBarcodeType(RNCameraView view, int barcodeType) {
+        view.setGoogleVisionBarcodeType(barcodeType);
+    }
+
+    @ReactProp(name = "googleVisionBarcodeMode")
+    public void setGoogleVisionBarcodeMode(RNCameraView view, int barcodeMode) {
+        view.setGoogleVisionBarcodeMode(barcodeMode);
+    }
+
+    @ReactProp(name = "textRecognizerEnabled")
+    public void setTextRecognizing(RNCameraView view, boolean textRecognizerEnabled) {
+        view.setShouldRecognizeText(textRecognizerEnabled);
+    }
+
+    @ReactProp(name = "TFOptions")
+    public void setTFOptions(RNCameraView view, ReadableMap options) {
+        String modelPath = options.getString("modelPath");
+        int numDetections = options.hasKey("numDetections") ? options.getInt("numDetections") : 100;
+        double imageMean = options.hasKey("imageMean") ? options.getDouble("imageMean") : 128f;
+        double imageStd = options.hasKey("imageStd") ? options.getDouble("imageStd") : 128f;
+        int numThreads = options.hasKey("numThreads") ? options.getInt("numThreads") : 4;
+        boolean isModelQuantized = !options.hasKey("isModelQuantized") || options.getBoolean("isModelQuantized");
+        int inputSize = options.hasKey("inputSize") ? options.getInt("inputSize") : 300;
+        double minimumConfidence = options.hasKey("minimumConfidence") ? options.getDouble("minimumConfidence") : 0.4f;
+
+        TFOptions tfOptions = new TFOptions(modelPath, numDetections, imageMean, imageStd, numThreads, isModelQuantized, inputSize, minimumConfidence);
+        view.setTFOptions(tfOptions);
+    }
+
+    @ReactProp(name = "TFObjectDetectorEnabled")
+    public void setTFObjectDetecting(RNCameraView view, boolean shouldTFObjectDetect) {
+        view.setShouldTFObjectDetect(shouldTFObjectDetect);
+    }
 }
