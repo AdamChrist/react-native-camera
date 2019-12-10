@@ -2,25 +2,32 @@ package tflite;
 
 public class TFOptions {
 
-    public TFOptions(String modelPath, int numDetections, double imageMean, double imageStd, int numThreads, boolean isModelQuantized, int inputSize, double minimumConfidence) {
+    // 模型路径
+    private String modelPath;
+    // 检测数量
+    private int numDetections;
+    // 类型数量
+    private int numClasses;
+    // 最低置信度
+    private float minimumConfidence;
+
+    private float imageMean;
+    private float imageStd;
+    private int numThreads;
+    private boolean isModelQuantized;
+    private int inputSize;
+
+    public TFOptions(String modelPath, int numDetections, int numClasses, float minimumConfidence, float imageMean, float imageStd, int numThreads, boolean isModelQuantized, int inputSize) {
         this.modelPath = modelPath;
         this.numDetections = numDetections;
+        this.numClasses = numClasses;
+        this.minimumConfidence = minimumConfidence;
         this.imageMean = imageMean;
         this.imageStd = imageStd;
         this.numThreads = numThreads;
         this.isModelQuantized = isModelQuantized;
         this.inputSize = inputSize;
-        this.minimumConfidence = minimumConfidence;
     }
-
-    private String modelPath;
-    private int numDetections;
-    private double imageMean;
-    private double imageStd;
-    private int numThreads;
-    private boolean isModelQuantized;
-    private int inputSize;
-    private double minimumConfidence;
 
     public String getModelPath() {
         return modelPath;
@@ -38,19 +45,19 @@ public class TFOptions {
         this.numDetections = numDetections;
     }
 
-    public double getImageMean() {
+    public float getImageMean() {
         return imageMean;
     }
 
-    public void setImageMean(double imageMean) {
+    public void setImageMean(float imageMean) {
         this.imageMean = imageMean;
     }
 
-    public double getImageStd() {
+    public float getImageStd() {
         return imageStd;
     }
 
-    public void setImageStd(double imageStd) {
+    public void setImageStd(float imageStd) {
         this.imageStd = imageStd;
     }
 
@@ -78,11 +85,19 @@ public class TFOptions {
         this.inputSize = inputSize;
     }
 
-    public double getMinimumConfidence() {
+    public float getMinimumConfidence() {
         return minimumConfidence;
     }
 
-    public void setMinimumConfidence(double minimumConfidence) {
+    public void setMinimumConfidence(float minimumConfidence) {
         this.minimumConfidence = minimumConfidence;
+    }
+
+    public int getNumClasses() {
+        return numClasses;
+    }
+
+    public void setNumClasses(int numClasses) {
+        this.numClasses = numClasses;
     }
 }

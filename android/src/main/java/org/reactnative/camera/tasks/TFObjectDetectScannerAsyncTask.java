@@ -53,7 +53,7 @@ public class TFObjectDetectScannerAsyncTask extends android.os.AsyncTask<Void, V
     @Override
     protected List<Classifier.Recognition> doInBackground(Void... voids) {
         // 起始时间
-//        long startTime = System.currentTimeMillis();
+        // long startTime = System.currentTimeMillis();
 
         if (isCancelled() || mDelegate == null || mtfDetector == null) {
             return null;
@@ -68,12 +68,6 @@ public class TFObjectDetectScannerAsyncTask extends android.os.AsyncTask<Void, V
 
         // 转换格式
         ImageUtils.convertYUV420SPToARGB8888(mImageData, mWidth, mHeight, rgbBytes);
-
-        // ----结束时间
-//        long endTime = System.currentTimeMillis();
-//        long runTime = endTime - startTime;
-//        Log.i(TAG, String.format("tf方法使用时间 %d ms", runTime));
-        // ----结束时间----end
 
         // 转成成 bitmap
         rgbFrameBitmap.setPixels(rgbBytes, 0, mWidth, 0, 0, mWidth, mHeight);
@@ -94,6 +88,12 @@ public class TFObjectDetectScannerAsyncTask extends android.os.AsyncTask<Void, V
         }
 
         List<Classifier.Recognition> recognitions = mtfDetector.recognizeImage(croppedBitmap);
+
+        // ----结束时间
+        // long endTime = System.currentTimeMillis();
+        // long runTime = endTime - startTime;
+        // Log.i(TAG, String.format("tf方法使用时间 %d ms", runTime));
+        // ----结束时间----end
 
         List<Classifier.Recognition> mappedRecognitions = new LinkedList<Classifier.Recognition>();
 

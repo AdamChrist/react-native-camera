@@ -195,14 +195,16 @@ public class CameraViewManager extends ViewGroupManager<RNCameraView> {
     public void setTFOptions(RNCameraView view, ReadableMap options) {
         String modelPath = options.getString("modelPath");
         int numDetections = options.hasKey("numDetections") ? options.getInt("numDetections") : 100;
-        double imageMean = options.hasKey("imageMean") ? options.getDouble("imageMean") : 128f;
-        double imageStd = options.hasKey("imageStd") ? options.getDouble("imageStd") : 128f;
-        int numThreads = options.hasKey("numThreads") ? options.getInt("numThreads") : 4;
-        boolean isModelQuantized = !options.hasKey("isModelQuantized") || options.getBoolean("isModelQuantized");
-        int inputSize = options.hasKey("inputSize") ? options.getInt("inputSize") : 300;
-        double minimumConfidence = options.hasKey("minimumConfidence") ? options.getDouble("minimumConfidence") : 0.4f;
+        int numClasses = options.hasKey("numClasses") ? options.getInt("numClasses") : 100;
+        float minimumConfidence = options.hasKey("minimumConfidence") ? (float) options.getDouble("minimumConfidence") : 0.4f;
 
-        TFOptions tfOptions = new TFOptions(modelPath, numDetections, imageMean, imageStd, numThreads, isModelQuantized, inputSize, minimumConfidence);
+        float imageMean = options.hasKey("imageMean") ? (float) options.getDouble("imageMean") : 128f;
+        float imageStd = options.hasKey("imageStd") ? (float) options.getDouble("imageStd") : 128f;
+        int numThreads = options.hasKey("numThreads") ? options.getInt("numThreads") : 4;
+        boolean isModelQuantized = options.hasKey("isModelQuantized") && options.getBoolean("isModelQuantized");
+        int inputSize = options.hasKey("inputSize") ? options.getInt("inputSize") : 320;
+
+        TFOptions tfOptions = new TFOptions(modelPath, numDetections, numClasses, minimumConfidence, imageMean, imageStd, numThreads, isModelQuantized, inputSize);
         view.setTFOptions(tfOptions);
     }
 

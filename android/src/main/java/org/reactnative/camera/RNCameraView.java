@@ -537,11 +537,15 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     }
 
     public void setShouldTFObjectDetect(boolean shouldTFObjectDetect) {
-        if (shouldTFObjectDetect && tfDetector == null) {
-            tfDetector = TFLiteObjectDetectionAPIModel.create(mThemedReactContext.getAssets(), this.tfOptions.getModelPath(), this.tfOptions.getInputSize(), this.tfOptions.isModelQuantized());
+        try {
+            if (shouldTFObjectDetect && tfDetector == null) {
+                tfDetector = TFLiteObjectDetectionAPIModel.create(mThemedReactContext,tfOptions);
+            }
+            this.mShouldTFObjectDetect = shouldTFObjectDetect;
+            setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText || mShouldTFObjectDetect);
+        } catch (Exception e) {
+            RNCameraViewHelper.emitMountErrorEvent(this, "TFLiteObjectDetectionAPIModel init error");
         }
-        this.mShouldTFObjectDetect = shouldTFObjectDetect;
-        setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText || mShouldTFObjectDetect);
     }
 
     @Override

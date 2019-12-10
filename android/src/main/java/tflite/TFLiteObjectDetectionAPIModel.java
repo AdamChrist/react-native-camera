@@ -5,6 +5,8 @@ import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.RectF;
 
+import com.facebook.react.bridge.ReactContext;
+
 import org.tensorflow.lite.Interpreter;
 
 import java.io.FileInputStream;
@@ -14,42 +16,23 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Vector;
 
 
 public class TFLiteObjectDetectionAPIModel implements Classifier {
 
-    // 识别的种类数量
-    private static final int NUM_CLASSES = 100;
-
-    // Only return this many results.
-    private static final int NUM_DETECTIONS = 100;
-    // Float model
-    private static final float IMAGE_MEAN = 128.0f;
-    private static final float IMAGE_STD = 128.0f;
-    // Number of threads in the java app
-    private static final int NUM_THREADS = 4;
+    private int numClasses;
+    private int numDetections;
+    private float imageMean;
+    private float imageStd;
+    private int numThreads;
     private boolean isModelQuantized;
-    // Config values.
     private int inputSize;
-    // Pre-allocated buffers.
-    private Vector<String> labels = new Vector<String>();
+
     private int[] intValues;
-    // outputLocations: array of shape [Batchsize, NUM_DETECTIONS,4]
-    // contains the location of detected boxes
-    private float[][][] outputLocations;
-    // outputClasses: array of shape [Batchsize, NUM_DETECTIONS]
-    // contains the classes of detected boxes
-    private float[][] outputClasses;
-    // outputScores: array of shape [Batchsize, NUM_DETECTIONS]
-    // contains the scores of detected boxes
-    private float[][] outputScores;
-    // numDetections: array of shape [Batchsize]
-    // contains the number of detected boxes
-    private float[] numDetections;
 
     private ByteBuffer imgData;
 
@@ -61,46 +44,52 @@ public class TFLiteObjectDetectionAPIModel implements Classifier {
     /**
      * Memory-map the model file in Assets.
      */
-    private static MappedByteBuffer loadModelFile(AssetManager assets, String modelFilename)
+    private static MappedByteBuffer loadModelFile(ReactContext context, String modelFilename)
             throws IOException {
-        AssetFileDescriptor fileDescriptor = assets.openFd(modelFilename);
-        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
-        FileChannel fileChannel = inputStream.getChannel();
-        long startOffset = fileDescriptor.getStartOffset();
-        long declaredLength = fileDescriptor.getDeclaredLength();
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+        AssetManager assets = context.getAssets();
+        String[] list = assets.list("");
+        // 尝试才asset中读取
+        if (list != null && Arrays.asList(list).contains(modelFilename)) {
+            AssetFileDescriptor fileDescriptor = assets.openFd(modelFilename);
+            FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+            FileChannel fileChannel = inputStream.getChannel();
+            long startOffset = fileDescriptor.getStartOffset();
+            long declaredLength = fileDescriptor.getDeclaredLength();
+            return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+        } else {
+            // 根据路径读取
+            FileInputStream inputStream = new FileInputStream(modelFilename);
+            FileChannel fileChannel = inputStream.getChannel();
+            return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+        }
     }
 
-    /**
-     * Initializes a native TensorFlow session for classifying images.
-     *
-     * @param assetManager  The asset manager to be used to load assets.
-     * @param modelFilename The filepath of the model GraphDef protocol buffer.
-     * @param inputSize     The size of image input
-     * @param isQuantized   Boolean representing model is quantized or not
-     */
-    public static Classifier create(
-            final AssetManager assetManager,
-            final String modelFilename,
-            final int inputSize,
-            final boolean isQuantized) {
+    public static Classifier create(ReactContext context, TFOptions tfOptions) {
+
         final TFLiteObjectDetectionAPIModel d = new TFLiteObjectDetectionAPIModel();
+        d.numClasses = tfOptions.getNumClasses();
+        d.numDetections = tfOptions.getNumDetections();
+        d.imageMean = tfOptions.getImageMean();
+        d.imageStd = tfOptions.getImageStd();
+        d.numThreads = tfOptions.getNumThreads();
+        d.isModelQuantized = tfOptions.isModelQuantized();
+        d.inputSize = tfOptions.getInputSize();
+
 
         final Interpreter.Options tfliteOptions = new Interpreter.Options();
-        tfliteOptions.setNumThreads(NUM_THREADS);
+        tfliteOptions.setNumThreads(d.numThreads);
 
-        d.inputSize = inputSize;
+        String modelPath = tfOptions.getModelPath();
 
         try {
-            d.tfLite = new Interpreter(loadModelFile(assetManager, modelFilename), tfliteOptions);
+            d.tfLite = new Interpreter(loadModelFile(context, modelPath), tfliteOptions);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
-        d.isModelQuantized = isQuantized;
         // Pre-allocate buffers.
         int numBytesPerChannel;
-        if (isQuantized) {
+        if (d.isModelQuantized) {
             numBytesPerChannel = 1; // Quantized
         } else {
             numBytesPerChannel = 4; // Floating point
@@ -110,10 +99,6 @@ public class TFLiteObjectDetectionAPIModel implements Classifier {
         d.imgData.order(ByteOrder.nativeOrder());
         d.intValues = new int[d.inputSize * d.inputSize];
 
-        d.outputLocations = new float[1][NUM_DETECTIONS][4];
-        d.outputClasses = new float[1][NUM_DETECTIONS];
-        d.outputScores = new float[1][NUM_DETECTIONS];
-        d.numDetections = new float[1];
         return d;
     }
 
@@ -133,36 +118,44 @@ public class TFLiteObjectDetectionAPIModel implements Classifier {
                     imgData.put((byte) ((pixelValue >> 8) & 0xFF));
                     imgData.put((byte) (pixelValue & 0xFF));
                 } else { // Float model
-                    imgData.putFloat((((pixelValue >> 16) & 0xFF) - IMAGE_MEAN) / IMAGE_STD);
-                    imgData.putFloat((((pixelValue >> 8) & 0xFF) - IMAGE_MEAN) / IMAGE_STD);
-                    imgData.putFloat(((pixelValue & 0xFF) - IMAGE_MEAN) / IMAGE_STD);
+                    imgData.putFloat((((pixelValue >> 16) & 0xFF) - imageMean) / imageStd);
+                    imgData.putFloat((((pixelValue >> 8) & 0xFF) - imageMean) / imageStd);
+                    imgData.putFloat(((pixelValue & 0xFF) - imageMean) / imageStd);
                 }
             }
         }
 
-        outputLocations = new float[1][NUM_DETECTIONS][4];
-        outputClasses = new float[1][NUM_DETECTIONS];
-        outputScores = new float[1][NUM_DETECTIONS];
-        numDetections = new float[1];
+        // outputLocations: array of shape [Batchsize, NUM_DETECTIONS,4]
+        // contains the location of detected boxes
+        float[][][] outputLocations = new float[1][numDetections][4];
+        // outputClasses: array of shape [Batchsize, NUM_DETECTIONS]
+        // contains the classes of detected boxes
+        float[][] outputClasses = new float[1][numDetections];
+        // outputScores: array of shape [Batchsize, NUM_DETECTIONS]
+        // contains the scores of detected boxes
+        float[][] outputScores = new float[1][numDetections];
+        // numDetections: array of shape [Batchsize]
+        // contains the number of detected boxes
+        float[] outputNumDetections = new float[1];
 
         Object[] inputArray = {imgData};
         Map<Integer, Object> outputMap = new HashMap<>();
         outputMap.put(0, outputLocations);
         outputMap.put(1, outputClasses);
         outputMap.put(2, outputScores);
-        outputMap.put(3, numDetections);
+        outputMap.put(3, outputNumDetections);
 
         // Run the inference call.
         tfLite.runForMultipleInputsOutputs(inputArray, outputMap);
 
         // Show the best detections.
         // after scaling them back to the input size.
-        final ArrayList<Recognition> recognitions = new ArrayList<>(NUM_DETECTIONS);
-        for (int i = 0; i < NUM_DETECTIONS; ++i) {
+        final ArrayList<Recognition> recognitions = new ArrayList<>(numDetections);
+        for (int i = 0; i < numDetections; ++i) {
 
             int outputClass = (int) outputClasses[0][i];
 
-            if (outputClass > NUM_CLASSES) {
+            if (outputClass > numClasses) {
                 continue;
             }
 
