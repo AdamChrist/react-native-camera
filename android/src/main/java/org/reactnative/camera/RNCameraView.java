@@ -18,6 +18,7 @@ import com.google.zxing.BarcodeFormat;
 import com.google.zxing.DecodeHintType;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.Result;
+import com.google.zxing.ResultPoint;
 
 import org.reactnative.barcodedetector.RNBarcodeDetector;
 import org.reactnative.camera.tasks.*;
@@ -26,6 +27,8 @@ import org.reactnative.facedetector.RNFaceDetector;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -341,8 +344,28 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
         if (!mShouldScanBarCodes || !mBarCodeTypes.contains(barCodeType)) {
             return;
         }
+        Result result = new Result(recode(barCode.getText()), new byte[0], new ResultPoint[0], BarcodeFormat.QR_CODE);
+        RNCameraViewHelper.emitBarCodeReadEvent(this, result, width, height);
+    }
 
-        RNCameraViewHelper.emitBarCodeReadEvent(this, barCode, width, height);
+    /**
+     * 中文乱码
+     */
+    private String recode(String str) {
+        String formart = "";
+        try {
+            boolean ISO = Charset.forName("ISO-8859-1").newEncoder()
+                    .canEncode(str);
+            if (ISO) {
+                formart = new String(str.getBytes("ISO-8859-1"), "GB2312");
+            } else {
+                formart = str;
+            }
+        } catch (UnsupportedEncodingException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return formart;
     }
 
     public void onBarCodeScanningTaskCompleted() {
