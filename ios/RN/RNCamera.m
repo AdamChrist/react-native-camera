@@ -938,7 +938,37 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
                     // If we were able to extract a string representation of the barcode, attach it to the event as well
                     // else just send null along.
                     if (codeMetadata.stringValue) {
-                        [event setObject:codeMetadata.stringValue forKey:@"data"];
+                        
+                        NSString *text = codeMetadata.stringValue;
+                        NSString *tempStr;
+                         
+                        //修正扫描出来二维码里有中文时为乱码问题
+                        if ([text canBeConvertedToEncoding:NSShiftJISStringEncoding])
+                        {
+                            tempStr = [NSString stringWithCString:[text cStringUsingEncoding:NSShiftJISStringEncoding] encoding:NSUTF8StringEncoding];
+                         
+                            //如果转化成utf-8失败，再尝试转化为gbk
+                            if (tempStr == nil)
+                            {
+                                tempStr = [NSString stringWithCString:[text cStringUsingEncoding:NSShiftJISStringEncoding] encoding:CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingGB_18030_2000)];
+                            }
+                        }
+                        else if([text canBeConvertedToEncoding:NSISOLatin1StringEncoding])
+                        {
+                            tempStr = [NSString stringWithCString:[text cStringUsingEncoding:NSISOLatin1StringEncoding] encoding:NSUTF8StringEncoding];
+                         
+                            //如果转化成utf-8失败，再尝试转化为gbk
+                            if (tempStr == nil)
+                            {
+                                tempStr = [NSString stringWithCString:[text cStringUsingEncoding:NSISOLatin1StringEncoding] encoding:CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingGB_18030_2000)];
+                            }
+                        }
+                        //如果转化都失败，就显示原始扫描出来的字符串
+                        if (tempStr == nil)
+                        {
+                            tempStr = text;
+                        }
+                        [event setObject:tempStr forKey:@"data"];
                     }
 
                     // Only send the event if we were able to pull out a binary or string representation
@@ -1192,3 +1222,4 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
 }
 
 @end
+
