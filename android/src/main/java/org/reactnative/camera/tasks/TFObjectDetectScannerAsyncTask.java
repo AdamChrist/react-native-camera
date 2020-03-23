@@ -77,7 +77,7 @@ public class TFObjectDetectScannerAsyncTask extends android.os.AsyncTask<Void, V
                 ImageUtils.getTransformationMatrix(
                         mWidth, mHeight,
                         inputSize, inputSize,
-                        0, false);
+                        mRotation, false);
 
 
         final Canvas canvas = new Canvas(croppedBitmap);
