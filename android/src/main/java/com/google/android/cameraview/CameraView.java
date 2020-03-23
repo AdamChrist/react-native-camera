@@ -229,6 +229,7 @@ public class CameraView extends FrameLayout {
         state.whiteBalance = getWhiteBalance();
         state.scanning = getScanning();
         state.pictureSize = getPictureSize();
+        state.previewSize = getPreviewSize();
         return state;
     }
 
@@ -250,6 +251,7 @@ public class CameraView extends FrameLayout {
         setWhiteBalance(ss.whiteBalance);
         setScanning(ss.scanning);
         setPictureSize(ss.pictureSize);
+        setPreviewSize(ss.previewSize);
     }
 
     public void setUsingCamera2Api(boolean useCamera2) {
@@ -269,6 +271,7 @@ public class CameraView extends FrameLayout {
             } else {
                 mImpl = new Camera2Api23(mCallbacks, mImpl.mPreview, mContext);
             }
+            onRestoreInstanceState(state);
         } else {
             if (mImpl instanceof Camera1) {
                 return;
@@ -279,7 +282,7 @@ public class CameraView extends FrameLayout {
             }
             mImpl = new Camera1(mCallbacks, mImpl.mPreview);
         }
-        start();
+//        start();
     }
 
     /**
@@ -569,6 +572,10 @@ public class CameraView extends FrameLayout {
         mImpl.setPreviewTexture(surfaceTexture);
     }
 
+    public void setPreviewSize(Size size) {
+      mImpl.setPreviewSize(size);
+    }
+
     public Size getPreviewSize() {
         return mImpl.getPreviewSize();
     }
@@ -665,6 +672,8 @@ public class CameraView extends FrameLayout {
         
         Size pictureSize;
 
+        Size previewSize;
+
         @SuppressWarnings("WrongConstant")
         public SavedState(Parcel source, ClassLoader loader) {
             super(source);
@@ -678,6 +687,7 @@ public class CameraView extends FrameLayout {
             whiteBalance = source.readInt();
             scanning = source.readByte() != 0;
             pictureSize = source.readParcelable(loader);
+            previewSize = source.readParcelable(loader);
         }
 
         public SavedState(Parcelable superState) {
@@ -697,6 +707,7 @@ public class CameraView extends FrameLayout {
             out.writeInt(whiteBalance);
             out.writeByte((byte) (scanning ? 1 : 0));
             out.writeParcelable(pictureSize, flags);
+            out.writeParcelable(previewSize, flags);
         }
 
         public static final Creator<SavedState> CREATOR

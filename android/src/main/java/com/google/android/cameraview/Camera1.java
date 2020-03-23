@@ -589,8 +589,12 @@ class Camera1 extends CameraViewImpl implements MediaRecorder.OnInfoListener,
 
     @Override
     public Size getPreviewSize() {
-        Camera.Size cameraSize = mCameraParameters.getPreviewSize();
-        return new Size(cameraSize.width, cameraSize.height);
+        if (mPreviewSize != null) {
+            return mPreviewSize;
+        } else {
+            Camera.Size cameraSize = mCameraParameters.getPreviewSize();
+            return new Size(cameraSize.width, cameraSize.height);
+        }
     }
 
     /**
@@ -664,7 +668,11 @@ class Camera1 extends CameraViewImpl implements MediaRecorder.OnInfoListener,
             mCamera.stopPreview();
             mIsPreviewActive = false;
         }
-        mCameraParameters.setPreviewSize(size.getWidth(), size.getHeight());
+        if (mPreviewSize != null) {
+          mCameraParameters.setPreviewSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+        } else {
+          mCameraParameters.setPreviewSize(size.getWidth(), size.getHeight());
+        }
         mCameraParameters.setPictureSize(mPictureSize.getWidth(), mPictureSize.getHeight());
         if (mOrientation != Constants.ORIENTATION_AUTO) {
             mCameraParameters.setRotation(calcCameraRotation(orientationEnumToRotation(mOrientation)));
