@@ -31,6 +31,7 @@ import android.support.v4.os.ParcelableCompat;
 import android.support.v4.os.ParcelableCompatCreatorCallbacks;
 import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -111,7 +112,7 @@ public class CameraView extends FrameLayout {
         // Internal setup
         final PreviewImpl preview = createPreviewImpl(context);
         mCallbacks = new CallbackBridge();
-        if (fallbackToOldApi || Build.VERSION.SDK_INT < 21) {
+        if (fallbackToOldApi || Build.VERSION.SDK_INT < 21 || Camera2.isLegacy(context)) {
             mImpl = new Camera1(mCallbacks, preview);
         } else if (Build.VERSION.SDK_INT < 23) {
             mImpl = new Camera2(mCallbacks, preview, context);
@@ -262,7 +263,7 @@ public class CameraView extends FrameLayout {
         boolean wasOpened = isCameraOpened();
         Parcelable state = onSaveInstanceState();
 
-        if (useCamera2) {
+        if (useCamera2 && !Camera2.isLegacy(mContext)) {
             if (wasOpened) {
                 stop();
             }
@@ -282,7 +283,9 @@ public class CameraView extends FrameLayout {
             }
             mImpl = new Camera1(mCallbacks, mImpl.mPreview);
         }
-//        start();
+        if(wasOpened){
+            start();
+        }
     }
 
     /**
@@ -290,17 +293,19 @@ public class CameraView extends FrameLayout {
      * {@link Activity#onResume()}.
      */
     public void start() {
-        if (!mImpl.start()) {
-            if (mImpl.getView() != null) {
-                this.removeView(mImpl.getView());
-            }
-            //store the state and restore this state after fall back to Camera1
-            Parcelable state=onSaveInstanceState();
-            // Camera2 uses legacy hardware layer; fall back to Camera1
-            mImpl = new Camera1(mCallbacks, createPreviewImpl(getContext()));
-            onRestoreInstanceState(state);
-            mImpl.start();
-        }
+        mImpl.start();
+
+//        if (!mImpl.start()) {
+//            if (mImpl.getView() != null) {
+//                this.removeView(mImpl.getView());
+//            }
+//            //store the state and restore this state after fall back to Camera1
+//            Parcelable state = onSaveInstanceState();
+//            // Camera2 uses legacy hardware layer; fall back to Camera1
+//            mImpl = new Camera1(mCallbacks, createPreviewImpl(getContext()));
+//            onRestoreInstanceState(state);
+//            mImpl.start();
+//        }
     }
 
     /**
