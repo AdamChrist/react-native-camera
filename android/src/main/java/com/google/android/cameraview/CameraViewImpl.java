@@ -31,6 +31,8 @@ abstract class CameraViewImpl {
 
     protected final PreviewImpl mPreview;
 
+    protected Size mPreviewSize;
+
     CameraViewImpl(Callback callback, PreviewImpl preview) {
         mCallback = callback;
         mPreview = preview;
@@ -116,6 +118,14 @@ abstract class CameraViewImpl {
     abstract public void pausePreview();
 
     abstract public void setPreviewTexture(SurfaceTexture surfaceTexture);
+
+  /**
+   * 设置预览的尺寸大小
+   * @param size
+   */
+  public void setPreviewSize(Size size) {
+      this.mPreviewSize = size;
+    }
 
     abstract public Size getPreviewSize();
 

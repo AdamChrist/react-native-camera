@@ -185,8 +185,10 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
                     byte[] data = new byte[buffer.remaining()];
                     buffer.get(data);
                     if (image.getFormat() == ImageFormat.JPEG) {
-                        // @TODO: implement deviceOrientation
-                        mCallback.onPictureTaken(data, 0);
+                      // @TODO: implement deviceOrientation
+                      mCallback.onPictureTaken(data, 0);
+                    } else if (image.getFormat() == ImageFormat.YUV_420_888) {
+                      mCallback.onFramePreview(getNV21DataFromImage(image), image.getWidth(), image.getHeight(), mDeviceOrientation);
                     } else {
                         mCallback.onFramePreview(data, image.getWidth(), image.getHeight(), mDisplayOrientation);
                     }
@@ -197,6 +199,62 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
 
     };
 
+  private static byte[] getNV21DataFromImage(Image image) {
+
+    Rect crop = image.getCropRect();
+    int format = image.getFormat();
+    int width = crop.width();
+    int height = crop.height();
+    Image.Plane[] planes = image.getPlanes();
+    byte[] data = new byte[width * height * ImageFormat.getBitsPerPixel(format) / 8];
+    byte[] rowData = new byte[planes[0].getRowStride()];
+
+    int channelOffset = 0;
+    int outputStride = 1;
+    for (int i = 0; i < planes.length; i++) {
+      switch (i) {
+        case 0:
+          channelOffset = 0;
+          outputStride = 1;
+          break;
+        case 1:
+          channelOffset = width * height + 1;
+          outputStride = 2;
+          break;
+        case 2:
+          channelOffset = width * height;
+          outputStride = 2;
+          break;
+      }
+      ByteBuffer buffer = planes[i].getBuffer();
+      int rowStride = planes[i].getRowStride();
+      int pixelStride = planes[i].getPixelStride();
+
+      int shift = (i == 0) ? 0 : 1;
+      int w = width >> shift;
+      int h = height >> shift;
+      buffer.position(rowStride * (crop.top >> shift) + pixelStride * (crop.left >> shift));
+      for (int row = 0; row < h; row++) {
+        int length;
+        if (pixelStride == 1 && outputStride == 1) {
+          length = w;
+          buffer.get(data, channelOffset, length);
+          channelOffset += length;
+        } else {
+          length = (w - 1) * pixelStride + 1;
+          buffer.get(rowData, 0, length);
+          for (int col = 0; col < w; col++) {
+            data[channelOffset] = rowData[col * pixelStride];
+            channelOffset += outputStride;
+          }
+        }
+        if (row < h - 1) {
+          buffer.position(buffer.position() + rowStride - length);
+        }
+      }
+    }
+    return data;
+  }
 
     private String mCameraId;
 
@@ -292,6 +350,7 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
     boolean start() {
         if (!chooseCameraIdByFacing()) {
             mAspectRatio = mInitialRatio;
+            mCallback.onMountError();
             return false;
         }
         collectCameraInfo();
@@ -384,7 +443,7 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
             mStillImageReader.close();
         }
         if (size == null) {
-          if (mAspectRatio == null) {
+          if (mAspectRatio == null || mPictureSize == null) {
             return;
           }
           mPictureSizes.sizes(mAspectRatio).last();
@@ -510,8 +569,12 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
                     mCaptureSession = null;
                 }
 
-                Size size = chooseOptimalSize();
-                mPreview.setBufferSize(size.getWidth(), size.getHeight());
+                if (mPreviewSize != null) {
+                  mPreview.setBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+                } else {
+                  Size size = chooseOptimalSize();
+                  mPreview.setBufferSize(size.getWidth(), size.getHeight());
+                }
                 Surface surface = getPreviewSurface();
                 Surface mMediaRecorderSurface = mMediaRecorder.getSurface();
 
@@ -651,8 +714,35 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
     @Override
     void setDeviceOrientation(int deviceOrientation) {
         mDeviceOrientation = deviceOrientation;
-        mPreview.setDisplayOrientation(mDeviceOrientation);
+//        mPreview.setDisplayOrientation(mDeviceOrientation);
     }
+
+    // This is a helper method to query Camera2 legacy status so we don't need
+    // to instantiate and set all its props in order to check if it is legacy or not
+    // and then fallback to Camera1. This way, legacy devices can fall back to Camera1 right away
+    // This method makes sure all cameras are not legacy, so further checks are not needed.
+    public static boolean isLegacy(Context context){
+        try{
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            String[] ids = manager.getCameraIdList();
+            for (String id : ids) {
+                CameraCharacteristics characteristics = manager.getCameraCharacteristics(id);
+                Integer level = characteristics.get(
+                        CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
+                if (level == null ||
+                        level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY) {
+                    Log.w(TAG, "Camera2 can only run in legacy mode and should not be used.");
+                    return true;
+                }
+            }
+            return false;
+        }
+        catch(CameraAccessException ex){
+            Log.e(TAG, "Failed to check camera legacy status, returning true.", ex);
+            return true;
+        }
+    }
+
 
     /**
      * <p>Chooses a camera ID by the specified camera facing ({@link #mFacing}).</p>
@@ -768,9 +858,15 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
         if (mScanImageReader != null) {
             mScanImageReader.close();
         }
-        Size largest = mPreviewSizes.sizes(mAspectRatio).last();
-        mScanImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
-                ImageFormat.YUV_420_888, 1);
+
+        if (mPreviewSize != null) {
+          mScanImageReader = ImageReader.newInstance(mPreviewSize.getWidth(), mPreviewSize.getHeight(),
+            ImageFormat.YUV_420_888, 1);
+        } else {
+          Size largest = mPreviewSizes.sizes(mAspectRatio).last();
+          mScanImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
+            ImageFormat.YUV_420_888, 1);
+        }
         mScanImageReader.setOnImageAvailableListener(mOnImageAvailableListener, null);
     }
 
@@ -795,8 +891,13 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
         if (!isCameraOpened() || !mPreview.isReady() || mStillImageReader == null || mScanImageReader == null) {
             return;
         }
-        Size previewSize = chooseOptimalSize();
-        mPreview.setBufferSize(previewSize.getWidth(), previewSize.getHeight());
+        if (mPreviewSize != null) {
+          mPreview.setBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+        } else {
+          Size previewSize = chooseOptimalSize();
+          mPreview.setBufferSize(previewSize.getWidth(), previewSize.getHeight());
+          mPreview.setSize(previewSize.getWidth(), previewSize.getHeight());
+        }
         Surface surface = getPreviewSurface();
         try {
             mPreviewRequestBuilder = mCamera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
@@ -858,6 +959,9 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
 
     @Override
     public Size getPreviewSize() {
+        if (mPreviewSize != null) {
+            return mPreviewSize;
+        }
         return new Size(mPreview.getWidth(), mPreview.getHeight());
     }
 
